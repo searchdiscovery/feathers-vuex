@@ -31,7 +31,9 @@ const getCopiesById = ({
 
 export default function makeServiceGetters() {
   return {
-    list: state => Object.values(state.keyedById),
+    list(state) {
+      return state.ids.map(id => state.keyedById[id])
+    },
     find: state => _params => {
       const params = unref(_params) || {}
 
@@ -42,7 +44,35 @@ export default function makeServiceGetters() {
         idField,
         tempsById
       } = state
-      const q = _omit(params.query || {}, paramsForServer)
+
+      // Set params.temps to true to include the tempsById records
+      params.temps = params.hasOwnProperty('temps') ? params.temps : false
+
+      // Set params.copies to true to include the copiesById records
+      params.copies = params.hasOwnProperty('copies') ? params.copies : false
+
+
+      const paramsForServerByValue = paramsForServer.filter(el => Array.isArray(el))
+
+      const q = paramsForServerByValue.reduce(
+        (acc, [key, filter]) => {
+          if (!acc[key]) return acc
+
+          if (
+            ((typeof filter === 'string' || typeof filter === 'number') &&
+              acc[key] === filter) ||
+            (typeof filter === 'function' && filter(acc[key]))
+          ) {
+            return _omit(acc, key)
+          }
+
+          return acc
+        },
+        _omit(
+          params.query || {},
+          paramsForServer.filter(el => typeof el === 'string')
+        )
+      )
 
       const { query, filters } = filterQuery(q, {
         operators: additionalOperators.concat(whitelist)
@@ -99,7 +129,6 @@ export default function makeServiceGetters() {
     ) => {
       const id = unref(_id)
       const params = unref(_params)
-
       const record = keyedById[id] && select(params, idField)(keyedById[id])
       if (record) {
         return record
@@ -114,14 +143,22 @@ export default function makeServiceGetters() {
       return copiesById[id]
     },
 
-    isCreatePendingById: ({ isIdCreatePending }: ServiceState) => (id: Id) =>
-      isIdCreatePending.includes(id),
-    isUpdatePendingById: ({ isIdUpdatePending }: ServiceState) => (id: Id) =>
-      isIdUpdatePending.includes(id),
-    isPatchPendingById: ({ isIdPatchPending }: ServiceState) => (id: Id) =>
-      isIdPatchPending.includes(id),
-    isRemovePendingById: ({ isIdRemovePending }: ServiceState) => (id: Id) =>
-      isIdRemovePending.includes(id),
+    isCreatePendingById:
+      ({ isIdCreatePending }: ServiceState) =>
+      (id: Id) =>
+        isIdCreatePending.includes(id),
+    isUpdatePendingById:
+      ({ isIdUpdatePending }: ServiceState) =>
+      (id: Id) =>
+        isIdUpdatePending.includes(id),
+    isPatchPendingById:
+      ({ isIdPatchPending }: ServiceState) =>
+      (id: Id) =>
+        isIdPatchPending.includes(id),
+    isRemovePendingById:
+      ({ isIdRemovePending }: ServiceState) =>
+      (id: Id) =>
+        isIdRemovePending.includes(id),
     isSavePendingById: (state: ServiceState, getters) => (id: Id) =>
       getters.isCreatePendingById(id) ||
       getters.isUpdatePendingById(id) ||
