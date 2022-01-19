@@ -38,7 +38,7 @@ export default function makeServiceGetters() {
       const params = unref(_params) || {}
 
       const {
-        paramsForServer,
+        paramsForServer = [],
         whitelist,
         keyedById,
         idField,
